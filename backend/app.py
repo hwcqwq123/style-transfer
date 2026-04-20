@@ -12,6 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = Path(__file__).resolve().parent
+
 UPLOAD_CONTENT_DIR = BASE_DIR / "uploads" / "content"
 UPLOAD_STYLE_DIR = BASE_DIR / "uploads" / "style"
 OUTPUT_DIR = BASE_DIR / "uploads" / "output"
@@ -22,40 +23,48 @@ for folder in [UPLOAD_CONTENT_DIR, UPLOAD_STYLE_DIR, OUTPUT_DIR]:
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "bmp", "webp"}
 
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.route("/api/style-transfer", methods=["POST"])
 def style_transfer():
-    if "content_image" not in request.files or "style_image" not in request.files:
-        return jsonify({"success": False, "message": "缺少上传图片"}), 400
-
-    content_file = request.files["content_image"]
-    style_file = request.files["style_image"]
     method = request.form.get("method", "adam").lower()
 
-    if not content_file.filename or not style_file.filename:
-        return jsonify({"success": False, "message": "请选择图片"}), 400
+    if "content_image" not in request.files:
+        return jsonify({"success": False, "message": "缺少内容图"}), 400
 
-    if not allowed_file(content_file.filename) or not allowed_file(style_file.filename):
-        return jsonify({"success": False, "message": "图片格式不支持"}), 400
+    content_file = request.files["content_image"]
+    style_file = request.files.get("style_image")
+
+    if not content_file.filename:
+        return jsonify({"success": False, "message": "请选择内容图"}), 400
+
+    if not allowed_file(content_file.filename):
+        return jsonify({"success": False, "message": "内容图格式不支持"}), 400
+
+    if method in ["adam", "lbfgs"]:
+        if style_file is None or not style_file.filename:
+            return jsonify({"success": False, "message": "请选择风格图"}), 400
+        if not allowed_file(style_file.filename):
+            return jsonify({"success": False, "message": "风格图格式不支持"}), 400
 
     task_id = uuid.uuid4().hex
 
     content_ext = content_file.filename.rsplit(".", 1)[1].lower()
-    style_ext = style_file.filename.rsplit(".", 1)[1].lower()
-
     content_name = secure_filename(f"{task_id}_content.{content_ext}")
-    style_name = secure_filename(f"{task_id}_style.{style_ext}")
     result_name = secure_filename(f"{task_id}_result.jpg")
 
     content_path = UPLOAD_CONTENT_DIR / content_name
-    style_path = UPLOAD_STYLE_DIR / style_name
     output_path = OUTPUT_DIR / result_name
-
     content_file.save(content_path)
-    style_file.save(style_path)
+
+    style_path = None
+    if style_file and style_file.filename:
+        style_ext = style_file.filename.rsplit(".", 1)[1].lower()
+        style_name = secure_filename(f"{task_id}_style.{style_ext}")
+        style_path = UPLOAD_STYLE_DIR / style_name
+        style_file.save(style_path)
 
     try:
         if method == "adam":
@@ -63,7 +72,7 @@ def style_transfer():
         elif method == "lbfgs":
             run_lbfgs(content_path, style_path, output_path)
         elif method == "cyclegan":
-            run_cyclegan(content_path, style_path, output_path)
+            run_cyclegan(content_path, output_path)
         else:
             return jsonify({"success": False, "message": "不支持的生成方法"}), 400
 

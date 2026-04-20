@@ -28,7 +28,7 @@
       <div class="notice-box">
         <p><strong>当前算法：</strong>{{ methodLabel }}</p>
         <p v-if="form.method === 'cyclegan'" class="tip-warning">
-          提示：CycleGAN 当前按训练好的模型做域转换，主要使用内容图进行 A→B 推理。
+          提示：CycleGAN 只需要上传内容图，系统将使用已训练好的模型直接生成结果图。
         </p>
       </div>
 
@@ -66,6 +66,7 @@
         </div>
 
         <div
+          v-if="form.method !== 'cyclegan'"
           class="card upload-card"
           :class="{ dragging: dragState.style }"
           @dragover.prevent="dragState.style = true"
@@ -130,7 +131,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 const API_BASE_URL = 'http://127.0.0.1:5000'
 
@@ -173,6 +174,9 @@ const methodLabel = computed(() => {
 })
 
 const canGenerate = computed(() => {
+  if (form.method === 'cyclegan') {
+    return !!files.content
+  }
   return !!(files.content && files.style)
 })
 
@@ -238,9 +242,22 @@ function clearResult() {
   setMessage('结果已清空', 'info')
 }
 
+watch(
+  () => form.method,
+  (newMethod) => {
+    if (newMethod === 'cyclegan') {
+      clearFile('style')
+    }
+  }
+)
+
 async function handleGenerate() {
   if (!canGenerate.value) {
-    setMessage('请先上传内容图和风格图', 'error')
+    if (form.method === 'cyclegan') {
+      setMessage('请先上传内容图', 'error')
+    } else {
+      setMessage('请先上传内容图和风格图', 'error')
+    }
     return
   }
 
@@ -251,8 +268,11 @@ async function handleGenerate() {
   try {
     const formData = new FormData()
     formData.append('content_image', files.content)
-    formData.append('style_image', files.style)
     formData.append('method', form.method)
+
+    if (form.method !== 'cyclegan' && files.style) {
+      formData.append('style_image', files.style)
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/style-transfer`, {
       method: 'POST',
