@@ -3,7 +3,7 @@
     <div class="container">
       <header class="header">
         <h1>图像风格迁移系统</h1>
-        <p>上传内容图和风格图，选择算法后生成结果</p>
+        <p>上传内容图和风格图，选择算法并设置参数后生成结果</p>
       </header>
 
       <div class="toolbar">
@@ -20,6 +20,7 @@
           <button
             v-if="form.method !== 'cyclegan'"
             class="param-btn"
+            type="button"
             @click="openParamModal"
           >
             调整参数
@@ -27,7 +28,11 @@
         </div>
 
         <div class="right-tools">
-          <button class="generate-btn" :disabled="loading || !canGenerate" @click="handleGenerate">
+          <button class="secondary-btn" type="button" :disabled="loading" @click="resetFrontendState">
+            清空页面
+          </button>
+
+          <button class="generate-btn" type="button" :disabled="loading || !canGenerate" @click="handleGenerate">
             {{ loading ? '生成中...' : '开始生成' }}
           </button>
         </div>
@@ -45,7 +50,7 @@
         </template>
 
         <p v-if="form.method === 'cyclegan'" class="tip-warning">
-          提示：CycleGAN 只需要上传内容图，系统将使用已训练好的模型直接生成结果图，不需要调参。
+          提示：CycleGAN 只需要上传内容图，不需要风格图，也不需要调这些参数。
         </p>
       </div>
 
@@ -58,10 +63,11 @@
           @drop.prevent="onDrop($event, 'content')"
         >
           <div class="card-title">内容图</div>
+
           <input
             ref="contentInputRef"
-            type="file"
             class="hidden-input"
+            type="file"
             accept="image/*"
             @change="onFileChange($event, 'content')"
           />
@@ -91,10 +97,11 @@
           @drop.prevent="onDrop($event, 'style')"
         >
           <div class="card-title">风格图</div>
+
           <input
             ref="styleInputRef"
-            type="file"
             class="hidden-input"
+            type="file"
             accept="image/*"
             @change="onFileChange($event, 'style')"
           />
@@ -129,7 +136,7 @@
               <a :href="resultImage" download="result.jpg">
                 <button type="button">下载结果</button>
               </a>
-              <button type="button" class="danger" @click="clearResult">清空结果</button>
+              <button type="button" class="danger" @click="clearResult()">清空结果</button>
             </div>
           </div>
 
@@ -145,7 +152,6 @@
       </div>
     </div>
 
-    <!-- 参数弹窗 -->
     <div v-if="showParamModal && form.method !== 'cyclegan'" class="modal-mask" @click.self="closeParamModal">
       <div class="modal-panel">
         <div class="modal-header">
@@ -275,8 +281,8 @@ const defaultParams = {
   },
 }
 
-function cloneParams(params) {
-  return JSON.parse(JSON.stringify(params))
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj))
 }
 
 const form = reactive({
@@ -307,11 +313,10 @@ const loading = ref(false)
 const resultImage = ref('')
 const contentInputRef = ref(null)
 const styleInputRef = ref(null)
-
 const showParamModal = ref(false)
 
-const savedParams = reactive(cloneParams(defaultParams))
-const paramDraft = reactive(cloneParams(defaultParams))
+const savedParams = reactive(deepClone(defaultParams))
+const paramDraft = reactive(deepClone(defaultParams))
 
 const methodLabel = computed(() => {
   const map = {
@@ -331,12 +336,12 @@ const canGenerate = computed(() => {
 
 const adamParamSummary = computed(() => {
   const p = savedParams.adam
-  return `steps=${p.steps}，lr=${p.lr}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}`
+  return `steps=${p.steps}，print_every=${p.print_every}，save_debug_every=${p.save_debug_every}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}，lr=${p.lr}`
 })
 
 const lbfgsParamSummary = computed(() => {
   const p = savedParams.lbfgs
-  return `steps=${p.steps}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}`
+  return `steps=${p.steps}，print_every=${p.print_every}，save_debug_every=${p.save_debug_every}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}`
 })
 
 function setMessage(text, type = 'info') {
@@ -352,19 +357,6 @@ function openFileDialog(type) {
   }
 }
 
-function onFileChange(event, type) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  updateFile(type, file)
-}
-
-function onDrop(event, type) {
-  dragState[type] = false
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  updateFile(type, file)
-}
-
 function updateFile(type, file) {
   if (!file.type.startsWith('image/')) {
     setMessage('请上传图片文件', 'error')
@@ -378,6 +370,19 @@ function updateFile(type, file) {
   files[type] = file
   previews[type] = URL.createObjectURL(file)
   setMessage(`${type === 'content' ? '内容图' : '风格图'}上传成功`, 'success')
+}
+
+function onFileChange(event, type) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  updateFile(type, file)
+}
+
+function onDrop(event, type) {
+  dragState[type] = false
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  updateFile(type, file)
 }
 
 function clearFile(type) {
@@ -396,14 +401,24 @@ function clearFile(type) {
   }
 }
 
-function clearResult() {
+function clearResult(showMsg = true) {
   resultImage.value = ''
-  setMessage('结果已清空', 'info')
+  if (showMsg) {
+    setMessage('结果已清空', 'info')
+  }
+}
+
+function resetFrontendState() {
+  clearFile('content')
+  clearFile('style')
+  clearResult(false)
+  message.text = ''
+  message.type = 'info'
 }
 
 function openParamModal() {
   if (form.method === 'cyclegan') return
-  paramDraft[form.method] = cloneParams(savedParams[form.method])
+  paramDraft[form.method] = deepClone(savedParams[form.method])
   showParamModal.value = true
 }
 
@@ -445,14 +460,15 @@ function saveParams() {
     return
   }
 
-  savedParams[currentMethod] = cloneParams(paramDraft[currentMethod])
+  savedParams[currentMethod] = deepClone(paramDraft[currentMethod])
+  console.log('saved params =>', currentMethod, savedParams[currentMethod])
   showParamModal.value = false
   setMessage(`${currentMethod.toUpperCase()} 参数已保存`, 'success')
 }
 
 function resetCurrentMethodParams() {
   if (form.method === 'cyclegan') return
-  paramDraft[form.method] = cloneParams(defaultParams[form.method])
+  paramDraft[form.method] = deepClone(defaultParams[form.method])
 }
 
 watch(
@@ -489,7 +505,9 @@ async function handleGenerate() {
     }
 
     if (form.method === 'adam' || form.method === 'lbfgs') {
-      formData.append('params', JSON.stringify(savedParams[form.method]))
+      const paramsPayload = deepClone(savedParams[form.method])
+      console.log('submit params =>', form.method, paramsPayload)
+      formData.append('params', JSON.stringify(paramsPayload))
     }
 
     const response = await fetch(`${API_BASE_URL}/api/style-transfer`, {
@@ -624,7 +642,8 @@ async function handleGenerate() {
   line-height: 1;
 }
 
-.generate-btn:disabled {
+.generate-btn:disabled,
+.secondary-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

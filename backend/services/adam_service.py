@@ -138,7 +138,6 @@ def run_adam(content_path, style_path, output_path, params=None):
     content_path = Path(content_path)
     style_path = Path(style_path)
     output_path = Path(output_path)
-
     params = params or {}
 
     STEPS = max(1, get_param(params, "steps", DEFAULT_STEPS, int))
@@ -155,13 +154,14 @@ def run_adam(content_path, style_path, output_path, params=None):
 
     print("=" * 60, flush=True)
     print("[Adam] Start style transfer", flush=True)
+    print(f"[Adam] params       = {params}", flush=True)
     print(f"[Adam] content_path = {content_path}", flush=True)
     print(f"[Adam] style_path   = {style_path}", flush=True)
     print(f"[Adam] output_path  = {output_path}", flush=True)
     print(
-        f"[Adam] STEPS={STEPS}, MAX_SIZE={MAX_SIZE}, LR={LR}, "
-        f"CONTENT_WEIGHT={CONTENT_WEIGHT}, STYLE_WEIGHT={STYLE_WEIGHT}, TV_WEIGHT={TV_WEIGHT}, "
-        f"PRINT_EVERY={PRINT_EVERY}, SAVE_DEBUG_EVERY={SAVE_DEBUG_EVERY}",
+        f"[Adam] STEPS={STEPS}, PRINT_EVERY={PRINT_EVERY}, SAVE_DEBUG_EVERY={SAVE_DEBUG_EVERY}, "
+        f"MAX_SIZE={MAX_SIZE}, LR={LR}, CONTENT_WEIGHT={CONTENT_WEIGHT}, "
+        f"STYLE_WEIGHT={STYLE_WEIGHT}, TV_WEIGHT={TV_WEIGHT}",
         flush=True
     )
 

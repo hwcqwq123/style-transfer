@@ -3,6 +3,7 @@ from flask_cors import CORS
 from pathlib import Path
 from werkzeug.utils import secure_filename
 import uuid
+import json
 
 from services.adam_service import run_adam
 from services.lbfgs_service import run_lbfgs
@@ -27,6 +28,22 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def parse_params_from_request():
+    raw_params = request.form.get("params", "").strip()
+    if not raw_params:
+        return {}
+
+    try:
+        params = json.loads(raw_params)
+    except Exception as e:
+        raise ValueError(f"参数 JSON 解析失败: {str(e)}")
+
+    if not isinstance(params, dict):
+        raise ValueError("params 必须是一个 JSON 对象")
+
+    return params
+
+
 @app.route("/api/style-transfer", methods=["POST"])
 def style_transfer():
     method = request.form.get("method", "adam").lower()
@@ -49,6 +66,15 @@ def style_transfer():
         if not allowed_file(style_file.filename):
             return jsonify({"success": False, "message": "风格图格式不支持"}), 400
 
+    try:
+        params = parse_params_from_request() if method in ["adam", "lbfgs"] else {}
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+    print("[API] method =", method, flush=True)
+    print("[API] request.form =", request.form, flush=True)
+    print("[API] params =", params, flush=True)
+
     task_id = uuid.uuid4().hex
 
     content_ext = content_file.filename.rsplit(".", 1)[1].lower()
@@ -68,9 +94,9 @@ def style_transfer():
 
     try:
         if method == "adam":
-            run_adam(content_path, style_path, output_path)
+            run_adam(content_path, style_path, output_path, params=params)
         elif method == "lbfgs":
-            run_lbfgs(content_path, style_path, output_path)
+            run_lbfgs(content_path, style_path, output_path, params=params)
         elif method == "cyclegan":
             run_cyclegan(content_path, output_path)
         else:
