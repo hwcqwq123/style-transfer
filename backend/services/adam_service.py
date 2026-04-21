@@ -12,19 +12,16 @@ import torch.nn.functional as F
 from PIL import Image
 from torchvision import models, transforms
 
-# =========================
-# Debug hyperparameters
-# 先用小一点的参数调试，跑通后再加大
-# =========================
-STEPS = 1000
-PRINT_EVERY = 1
-SAVE_DEBUG_EVERY = 100
-MAX_SIZE = 384
 
-CONTENT_WEIGHT = 0.5
-STYLE_WEIGHT = 3e6
-TV_WEIGHT = 5e-6
-LR = 0.02
+DEFAULT_STEPS = 1000
+DEFAULT_PRINT_EVERY = 1
+DEFAULT_SAVE_DEBUG_EVERY = 100
+DEFAULT_MAX_SIZE = 384
+
+DEFAULT_CONTENT_WEIGHT = 0.5
+DEFAULT_STYLE_WEIGHT = 3e6
+DEFAULT_TV_WEIGHT = 5e-6
+DEFAULT_LR = 0.02
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -55,6 +52,15 @@ LAYER_CFG = LayerCfg(
         "conv5_1": 0.2,
     },
 )
+
+
+def get_param(params: dict | None, key: str, default, cast_func):
+    if not params or key not in params:
+        return default
+    try:
+        return cast_func(params[key])
+    except Exception:
+        return default
 
 
 def resize_hw_keep_ratio(w: int, h: int, max_side: int) -> Tuple[int, int]:
@@ -128,10 +134,21 @@ def tv_loss(x: torch.Tensor) -> torch.Tensor:
     return dh + dw
 
 
-def run_adam(content_path, style_path, output_path):
+def run_adam(content_path, style_path, output_path, params=None):
     content_path = Path(content_path)
     style_path = Path(style_path)
     output_path = Path(output_path)
+
+    params = params or {}
+
+    STEPS = max(1, get_param(params, "steps", DEFAULT_STEPS, int))
+    PRINT_EVERY = max(1, get_param(params, "print_every", DEFAULT_PRINT_EVERY, int))
+    SAVE_DEBUG_EVERY = max(1, get_param(params, "save_debug_every", DEFAULT_SAVE_DEBUG_EVERY, int))
+    MAX_SIZE = max(64, get_param(params, "max_size", DEFAULT_MAX_SIZE, int))
+    CONTENT_WEIGHT = max(0.0, get_param(params, "content_weight", DEFAULT_CONTENT_WEIGHT, float))
+    STYLE_WEIGHT = max(0.0, get_param(params, "style_weight", DEFAULT_STYLE_WEIGHT, float))
+    TV_WEIGHT = max(0.0, get_param(params, "tv_weight", DEFAULT_TV_WEIGHT, float))
+    LR = max(1e-8, get_param(params, "lr", DEFAULT_LR, float))
 
     debug_dir = output_path.parent / "adam_debug"
     debug_dir.mkdir(parents=True, exist_ok=True)
@@ -143,7 +160,8 @@ def run_adam(content_path, style_path, output_path):
     print(f"[Adam] output_path  = {output_path}", flush=True)
     print(
         f"[Adam] STEPS={STEPS}, MAX_SIZE={MAX_SIZE}, LR={LR}, "
-        f"CONTENT_WEIGHT={CONTENT_WEIGHT}, STYLE_WEIGHT={STYLE_WEIGHT}, TV_WEIGHT={TV_WEIGHT}",
+        f"CONTENT_WEIGHT={CONTENT_WEIGHT}, STYLE_WEIGHT={STYLE_WEIGHT}, TV_WEIGHT={TV_WEIGHT}, "
+        f"PRINT_EVERY={PRINT_EVERY}, SAVE_DEBUG_EVERY={SAVE_DEBUG_EVERY}",
         flush=True
     )
 

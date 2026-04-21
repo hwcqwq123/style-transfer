@@ -77,3 +77,6 @@ style-transfer/
 
 记得在backend里面pip install wandb
 pip install dominate
+
+
+## 这次的修改要加入调参，在每一个部分

@@ -16,6 +16,14 @@
               <option value="cyclegan">CycleGAN</option>
             </select>
           </div>
+
+          <button
+            v-if="form.method !== 'cyclegan'"
+            class="param-btn"
+            @click="openParamModal"
+          >
+            调整参数
+          </button>
         </div>
 
         <div class="right-tools">
@@ -27,8 +35,17 @@
 
       <div class="notice-box">
         <p><strong>当前算法：</strong>{{ methodLabel }}</p>
+
+        <template v-if="form.method === 'adam'">
+          <p><strong>当前参数：</strong>{{ adamParamSummary }}</p>
+        </template>
+
+        <template v-else-if="form.method === 'lbfgs'">
+          <p><strong>当前参数：</strong>{{ lbfgsParamSummary }}</p>
+        </template>
+
         <p v-if="form.method === 'cyclegan'" class="tip-warning">
-          提示：CycleGAN 只需要上传内容图，系统将使用已训练好的模型直接生成结果图。
+          提示：CycleGAN 只需要上传内容图，系统将使用已训练好的模型直接生成结果图，不需要调参。
         </p>
       </div>
 
@@ -59,8 +76,8 @@
             <img :src="previews.content" alt="内容图" class="preview-image" />
             <div class="file-name">{{ files.content?.name }}</div>
             <div class="btn-row">
-              <button @click="openFileDialog('content')">重新选择</button>
-              <button class="danger" @click="clearFile('content')">删除</button>
+              <button type="button" @click="openFileDialog('content')">重新选择</button>
+              <button type="button" class="danger" @click="clearFile('content')">删除</button>
             </div>
           </div>
         </div>
@@ -92,8 +109,8 @@
             <img :src="previews.style" alt="风格图" class="preview-image" />
             <div class="file-name">{{ files.style?.name }}</div>
             <div class="btn-row">
-              <button @click="openFileDialog('style')">重新选择</button>
-              <button class="danger" @click="clearFile('style')">删除</button>
+              <button type="button" @click="openFileDialog('style')">重新选择</button>
+              <button type="button" class="danger" @click="clearFile('style')">删除</button>
             </div>
           </div>
         </div>
@@ -110,9 +127,9 @@
             <img :src="resultImage" alt="结果图" class="preview-image" />
             <div class="btn-row">
               <a :href="resultImage" download="result.jpg">
-                <button>下载结果</button>
+                <button type="button">下载结果</button>
               </a>
-              <button class="danger" @click="clearResult">清空结果</button>
+              <button type="button" class="danger" @click="clearResult">清空结果</button>
             </div>
           </div>
 
@@ -127,6 +144,107 @@
         {{ message.text }}
       </div>
     </div>
+
+    <!-- 参数弹窗 -->
+    <div v-if="showParamModal && form.method !== 'cyclegan'" class="modal-mask" @click.self="closeParamModal">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h2>{{ form.method === 'adam' ? 'Adam 参数设置' : 'LBFGS 参数设置' }}</h2>
+          <button class="close-btn" type="button" @click="closeParamModal">×</button>
+        </div>
+
+        <div class="modal-body">
+          <template v-if="form.method === 'adam'">
+            <div class="form-grid">
+              <div class="form-item">
+                <label>迭代次数 STEPS</label>
+                <input v-model.number="paramDraft.adam.steps" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>打印间隔 PRINT_EVERY</label>
+                <input v-model.number="paramDraft.adam.print_every" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>调试图保存间隔 SAVE_DEBUG_EVERY</label>
+                <input v-model.number="paramDraft.adam.save_debug_every" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>最大边长 MAX_SIZE</label>
+                <input v-model.number="paramDraft.adam.max_size" type="number" min="64" />
+              </div>
+
+              <div class="form-item">
+                <label>内容权重 CONTENT_WEIGHT</label>
+                <input v-model.number="paramDraft.adam.content_weight" type="number" min="0" step="0.000001" />
+              </div>
+
+              <div class="form-item">
+                <label>风格权重 STYLE_WEIGHT</label>
+                <input v-model.number="paramDraft.adam.style_weight" type="number" min="0" step="0.000001" />
+              </div>
+
+              <div class="form-item">
+                <label>TV 权重 TV_WEIGHT</label>
+                <input v-model.number="paramDraft.adam.tv_weight" type="number" min="0" step="0.000001" />
+              </div>
+
+              <div class="form-item">
+                <label>学习率 LR</label>
+                <input v-model.number="paramDraft.adam.lr" type="number" min="0.000001" step="0.000001" />
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="form.method === 'lbfgs'">
+            <div class="form-grid">
+              <div class="form-item">
+                <label>迭代次数 STEPS</label>
+                <input v-model.number="paramDraft.lbfgs.steps" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>打印间隔 PRINT_EVERY</label>
+                <input v-model.number="paramDraft.lbfgs.print_every" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>调试图保存间隔 SAVE_DEBUG_EVERY</label>
+                <input v-model.number="paramDraft.lbfgs.save_debug_every" type="number" min="1" />
+              </div>
+
+              <div class="form-item">
+                <label>最大边长 MAX_SIZE</label>
+                <input v-model.number="paramDraft.lbfgs.max_size" type="number" min="64" />
+              </div>
+
+              <div class="form-item">
+                <label>内容权重 CONTENT_WEIGHT</label>
+                <input v-model.number="paramDraft.lbfgs.content_weight" type="number" min="0" step="0.000001" />
+              </div>
+
+              <div class="form-item">
+                <label>风格权重 STYLE_WEIGHT</label>
+                <input v-model.number="paramDraft.lbfgs.style_weight" type="number" min="0" step="0.000001" />
+              </div>
+
+              <div class="form-item">
+                <label>TV 权重 TV_WEIGHT</label>
+                <input v-model.number="paramDraft.lbfgs.tv_weight" type="number" min="0" step="0.000001" />
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="secondary-btn" @click="resetCurrentMethodParams">恢复默认</button>
+          <button type="button" class="secondary-btn" @click="closeParamModal">取消</button>
+          <button type="button" class="generate-btn" @click="saveParams">保存参数</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -134,6 +252,32 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 const API_BASE_URL = 'http://127.0.0.1:5000'
+
+const defaultParams = {
+  adam: {
+    steps: 1000,
+    print_every: 1,
+    save_debug_every: 100,
+    max_size: 384,
+    content_weight: 0.5,
+    style_weight: 3000000,
+    tv_weight: 0.000005,
+    lr: 0.02,
+  },
+  lbfgs: {
+    steps: 1000,
+    print_every: 1,
+    save_debug_every: 100,
+    max_size: 384,
+    content_weight: 0.5,
+    style_weight: 3000000,
+    tv_weight: 0.00001,
+  },
+}
+
+function cloneParams(params) {
+  return JSON.parse(JSON.stringify(params))
+}
 
 const form = reactive({
   method: 'adam',
@@ -164,6 +308,11 @@ const resultImage = ref('')
 const contentInputRef = ref(null)
 const styleInputRef = ref(null)
 
+const showParamModal = ref(false)
+
+const savedParams = reactive(cloneParams(defaultParams))
+const paramDraft = reactive(cloneParams(defaultParams))
+
 const methodLabel = computed(() => {
   const map = {
     adam: 'Adam 风格迁移',
@@ -178,6 +327,16 @@ const canGenerate = computed(() => {
     return !!files.content
   }
   return !!(files.content && files.style)
+})
+
+const adamParamSummary = computed(() => {
+  const p = savedParams.adam
+  return `steps=${p.steps}，lr=${p.lr}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}`
+})
+
+const lbfgsParamSummary = computed(() => {
+  const p = savedParams.lbfgs
+  return `steps=${p.steps}，max_size=${p.max_size}，content_weight=${p.content_weight}，style_weight=${p.style_weight}，tv_weight=${p.tv_weight}`
 })
 
 function setMessage(text, type = 'info') {
@@ -242,11 +401,66 @@ function clearResult() {
   setMessage('结果已清空', 'info')
 }
 
+function openParamModal() {
+  if (form.method === 'cyclegan') return
+  paramDraft[form.method] = cloneParams(savedParams[form.method])
+  showParamModal.value = true
+}
+
+function closeParamModal() {
+  showParamModal.value = false
+}
+
+function validateMethodParams(method, params) {
+  const integerFields = ['steps', 'print_every', 'save_debug_every', 'max_size']
+  const floatFields =
+    method === 'adam'
+      ? ['content_weight', 'style_weight', 'tv_weight', 'lr']
+      : ['content_weight', 'style_weight', 'tv_weight']
+
+  for (const key of integerFields) {
+    if (!Number.isFinite(params[key]) || params[key] <= 0 || !Number.isInteger(params[key])) {
+      return `${key} 必须是大于 0 的整数`
+    }
+  }
+
+  for (const key of floatFields) {
+    if (!Number.isFinite(params[key]) || params[key] < 0) {
+      return `${key} 必须是大于等于 0 的数字`
+    }
+  }
+
+  if (method === 'adam' && params.lr <= 0) {
+    return 'lr 必须大于 0'
+  }
+
+  return ''
+}
+
+function saveParams() {
+  const currentMethod = form.method
+  const err = validateMethodParams(currentMethod, paramDraft[currentMethod])
+  if (err) {
+    setMessage(err, 'error')
+    return
+  }
+
+  savedParams[currentMethod] = cloneParams(paramDraft[currentMethod])
+  showParamModal.value = false
+  setMessage(`${currentMethod.toUpperCase()} 参数已保存`, 'success')
+}
+
+function resetCurrentMethodParams() {
+  if (form.method === 'cyclegan') return
+  paramDraft[form.method] = cloneParams(defaultParams[form.method])
+}
+
 watch(
   () => form.method,
   (newMethod) => {
     if (newMethod === 'cyclegan') {
       clearFile('style')
+      showParamModal.value = false
     }
   }
 )
@@ -272,6 +486,10 @@ async function handleGenerate() {
 
     if (form.method !== 'cyclegan' && files.style) {
       formData.append('style_image', files.style)
+    }
+
+    if (form.method === 'adam' || form.method === 'lbfgs') {
+      formData.append('params', JSON.stringify(savedParams[form.method]))
     }
 
     const response = await fetch(`${API_BASE_URL}/api/style-transfer`, {
@@ -342,6 +560,14 @@ async function handleGenerate() {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.left-tools,
+.right-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .select-group {
   display: flex;
   align-items: center;
@@ -363,17 +589,39 @@ async function handleGenerate() {
 }
 
 .generate-btn,
+.param-btn,
+.secondary-btn,
 .btn-row button,
-.btn-row a button {
+.btn-row a button,
+.close-btn {
   height: 42px;
   padding: 0 18px;
   border: none;
   border-radius: 10px;
-  background: #4f46e5;
   color: white;
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
+}
+
+.generate-btn {
+  background: #4f46e5;
+}
+
+.param-btn {
+  background: #0f766e;
+}
+
+.secondary-btn {
+  background: #6b7280;
+}
+
+.close-btn {
+  width: 42px;
+  padding: 0;
+  background: #ef4444;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .generate-btn:disabled {
@@ -524,6 +772,76 @@ async function handleGenerate() {
   margin-bottom: 14px;
 }
 
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 999;
+}
+
+.modal-panel {
+  width: min(820px, 100%);
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 22px;
+}
+
+.modal-body {
+  padding: 22px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-item label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-item input {
+  height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 22px 22px;
+  border-top: 1px solid #e5e7eb;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -540,7 +858,26 @@ async function handleGenerate() {
     align-items: stretch;
   }
 
+  .left-tools,
+  .right-tools {
+    width: 100%;
+  }
+
   .generate-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-footer button {
     width: 100%;
   }
 }

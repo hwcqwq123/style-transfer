@@ -4,10 +4,10 @@
   "epoch": "200",
   "num_test": 1,
   "device": "cpu",
-  "total_time_sec": 3.1869800090789795,
-  "avg_infer_time_sec": 1.2797980308532715,
-  "avg_ssim": 0.6976794197210071,
-  "avg_psnr_db": 15.509389137774503,
+  "total_time_sec": 4.262079954147339,
+  "avg_infer_time_sec": 1.7004995346069336,
+  "avg_ssim": 0.7757127432569262,
+  "avg_psnr_db": 18.90192852105666,
   "metrics_csv": "E:\\style-transfer-project\\backend\\uploads\\cyclegan_results\\coco2vango\\test_200\\metrics\\metrics.csv",
   "web_dir": "E:\\style-transfer-project\\backend\\uploads\\cyclegan_results\\coco2vango\\test_200"
 }
